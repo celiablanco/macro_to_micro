@@ -1,139 +1,116 @@
 """
-Generate response.docx — formal response letter addressing all reviewer comments.
+Generate response.pdf — formal response letter addressing all reviewer comments.
+Uses reportlab to produce a PDF with the same content as generate_response_docx.py.
 """
 import os
-from docx import Document
-from docx.shared import Pt, RGBColor, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch, cm
+from reportlab.lib.colors import black
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 
-OUTPATH = os.path.join(os.path.dirname(__file__), 'response.docx')
+OUTPATH = os.path.join(os.path.dirname(__file__), 'response.pdf')
 
-FONT_NAME = 'Times New Roman'
+doc = SimpleDocTemplate(OUTPATH, pagesize=letter,
+                        topMargin=2.03*cm, bottomMargin=2.03*cm,
+                        leftMargin=2.54*cm, rightMargin=2.54*cm)
 
-doc = Document()
+styles = getSampleStyleSheet()
 
-for section in doc.sections:
-    section.top_margin = Cm(2.03)
-    section.bottom_margin = Cm(2.03)
-    section.left_margin = Cm(2.54)
-    section.right_margin = Cm(2.54)
-
-style = doc.styles['Normal']
-style.font.name = FONT_NAME
-style.font.size = Pt(10)
-style.paragraph_format.space_after = Pt(6)
-
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
-def add_heading(text, level=1):
-    h = doc.add_heading(text, level=level)
-    for run in h.runs:
-        run.font.name = FONT_NAME
-        run.font.color.rgb = RGBColor(0, 0, 0)
-    return h
-
-
-def add_para(text, bold=False, italic=False, indent=False, space_after=Pt(6)):
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.space_after = space_after
-    if indent:
-        p.paragraph_format.left_indent = Cm(1.0)
-    run = p.add_run(text)
-    run.font.name = FONT_NAME
-    run.font.size = Pt(10)
-    if bold:
-        run.bold = True
-    if italic:
-        run.italic = True
-    return p
+# Custom styles
+title_style = ParagraphStyle('Title2', parent=styles['Title'],
+                              fontName='Times-Roman', fontSize=16,
+                              leading=20, spaceAfter=4, alignment=TA_CENTER)
+subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'],
+                                 fontName='Times-Italic', fontSize=11,
+                                 leading=14, spaceAfter=4, alignment=TA_CENTER)
+journal_style = ParagraphStyle('Journal', parent=styles['Normal'],
+                                fontName='Times-Roman', fontSize=10,
+                                leading=14, spaceAfter=18, alignment=TA_CENTER)
+body_style = ParagraphStyle('Body2', parent=styles['Normal'],
+                             fontName='Times-Roman', fontSize=10,
+                             leading=14, spaceAfter=6, alignment=TA_JUSTIFY)
+heading1_style = ParagraphStyle('H1', parent=styles['Heading1'],
+                                 fontName='Times-Bold', fontSize=14,
+                                 leading=18, spaceBefore=18, spaceAfter=8,
+                                 textColor=black)
+heading2_style = ParagraphStyle('H2', parent=styles['Heading2'],
+                                 fontName='Times-Bold', fontSize=12,
+                                 leading=15, spaceBefore=12, spaceAfter=6,
+                                 textColor=black)
+comment_style = ParagraphStyle('Comment', parent=body_style,
+                                fontName='Times-Italic', fontSize=10,
+                                leading=14, spaceAfter=4,
+                                leftIndent=1.0*cm, alignment=TA_JUSTIFY)
+response_style = ParagraphStyle('Response', parent=body_style,
+                                 fontName='Times-Roman', fontSize=10,
+                                 leading=14, spaceAfter=12, alignment=TA_JUSTIFY)
 
 
-def add_comment_response(comment_text, response_text):
+def B(text):
+    return f'<b>{text}</b>'
+
+def I(text):
+    return f'<i>{text}</i>'
+
+def BI(text):
+    return f'<b><i>{text}</i></b>'
+
+def nl2br(text):
+    """Convert newlines to <br/> for reportlab Paragraphs."""
+    return text.replace('\n', '<br/>')
+
+
+def add_comment_response(story, comment_text, response_text):
     """Add a reviewer comment (italic, indented) followed by a response."""
-    # Comment
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.left_indent = Cm(1.0)
-    p.paragraph_format.space_after = Pt(4)
-    label = p.add_run("Comment: ")
-    label.font.name = FONT_NAME
-    label.font.size = Pt(10)
-    label.bold = True
-    label.italic = True
-    body = p.add_run(comment_text)
-    body.font.name = FONT_NAME
-    body.font.size = Pt(10)
-    body.italic = True
+    comment_para = f'{BI("Comment: ")}{I(comment_text)}'
+    story.append(Paragraph(comment_para, comment_style))
 
-    # Response
-    p2 = doc.add_paragraph()
-    p2.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p2.paragraph_format.space_after = Pt(12)
-    label2 = p2.add_run("Response: ")
-    label2.font.name = FONT_NAME
-    label2.font.size = Pt(10)
-    label2.bold = True
-    body2 = p2.add_run(response_text)
-    body2.font.name = FONT_NAME
-    body2.font.size = Pt(10)
+    response_para = f'{B("Response: ")}{nl2br(response_text)}'
+    story.append(Paragraph(response_para, response_style))
 
+
+story = []
 
 # ═════════════════════════════════════════════════════════════════════════════
-# CONTENT
+# HEADER
 # ═════════════════════════════════════════════════════════════════════════════
 
-# Title
-p = doc.add_paragraph()
-p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-p.paragraph_format.space_after = Pt(4)
-run = p.add_run("Response to Reviewer Comments")
-run.font.name = FONT_NAME
-run.font.size = Pt(16)
-run.bold = True
-
-# Manuscript title
-p = doc.add_paragraph()
-p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-p.paragraph_format.space_after = Pt(4)
-run = p.add_run(
-    "Context Without Contact: Top-Down Information Flow from Shared "
-    "Modulation in Uncoupled Prebiotic Systems"
-)
-run.font.name = FONT_NAME
-run.font.size = Pt(11)
-run.italic = True
-
-# Journal
-p = doc.add_paragraph()
-p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-p.paragraph_format.space_after = Pt(18)
-run = p.add_run("Manuscript submitted to Royal Society Open Science")
-run.font.name = FONT_NAME
-run.font.size = Pt(10)
+story.append(Paragraph(B("Response to Reviewer Comments"), title_style))
+story.append(Paragraph(
+    I("Context Without Contact: Top-Down Information Flow from Shared "
+      "Modulation in Uncoupled Prebiotic Systems"),
+    subtitle_style
+))
+story.append(Paragraph(
+    "Manuscript submitted to Royal Society Open Science",
+    journal_style
+))
 
 # ── Preamble ─────────────────────────────────────────────────────────────────
 
-add_para(
+story.append(Paragraph(
     "We thank the reviewers for their constructive and insightful comments. "
     "We have carefully addressed every point raised. Below, we respond to "
     "each comment individually and describe the specific changes made. "
     "All modifications to the manuscript are highlighted in red font in the "
-    "revised manuscript and supplementary information."
-)
+    "revised manuscript and supplementary information.",
+    body_style
+))
+story.append(Spacer(1, 6))
 
 # ═════════════════════════════════════════════════════════════════════════════
 # REVIEWER 1
 # ═════════════════════════════════════════════════════════════════════════════
 
-add_heading("Reviewer 1", level=1)
+story.append(Paragraph("Reviewer 1", heading1_style))
 
 # ── Major 1 ──────────────────────────────────────────────────────────────────
 
-add_heading("Major Comment 1: Strengthen the Introduction", level=2)
+story.append(Paragraph("Major Comment 1: Strengthen the Introduction", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     "The article is structured into three sections: the Introduction provides "
     "background, the Results section outlines the methodology and numerical "
     "experiments, and the Discussion interprets the findings in the context of "
@@ -153,11 +130,11 @@ add_comment_response(
     "paragraph now provides the conceptual context for our study, covering the "
     "taxonomy of top-down causation mechanisms (Ellis 2012), the identification "
     "of major evolutionary transitions as events where independent replicating "
-    "entities become integrated into higher-level units (Szathm\u00e1ry & Maynard "
+    "entities become integrated into higher-level units (Szathm\u00e1ry &amp; Maynard "
     "Smith 1995; Szathm\u00e1ry 2015), top-down causation by information control "
-    "(Auletta, Ellis & Jaeger 2008), and the characterization of the origin of "
+    "(Auletta, Ellis &amp; Jaeger 2008), and the characterization of the origin of "
     "life as a transition from dynamics governed by physical law to dynamics "
-    "governed by information (Walker 2014; Walker & Davies 2013).\n\n"
+    "governed by information (Walker 2014; Walker &amp; Davies 2013).\n\n"
     "(b) Logistic maps in computational biology: We added a paragraph covering "
     "the use of logistic map models in population dynamics and computational "
     "biology, including their role as minimal models exhibiting deterministic "
@@ -173,17 +150,17 @@ add_comment_response(
     "neuroscience (Vicente et al. 2011; Bossomaier et al. 2016), climate "
     "science (Runge et al. 2014; Runge 2018), and ecology (Sugihara et al. "
     "2012). We explicitly discuss a key limitation of standard TE \u2014 its "
-    "sensitivity to common-driver confounds (Lizier & Prokopenko 2010; Runge "
+    "sensitivity to common-driver confounds (Lizier &amp; Prokopenko 2010; Runge "
     "et al. 2014) \u2014 and introduce conditional transfer entropy (CTE) as a "
-    "principled correction (Runge 2018; Smirnov & Bezruchko 2012), which we "
+    "principled correction (Runge 2018; Smirnov &amp; Bezruchko 2012), which we "
     "then employ in our analysis."
 )
 
 # ── Major 2 ──────────────────────────────────────────────────────────────────
 
-add_heading("Major Comment 2: Add a dedicated Methodology section", level=2)
+story.append(Paragraph("Major Comment 2: Add a dedicated Methodology section", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     "I strongly recommend adding a dedicated methodology section that clearly "
     "presents the model and parameter choices, some of which appear arbitrary "
     "(e.g., r_min, r_max, K\u2080, A, \u03c9). This would help demonstrate the "
@@ -221,15 +198,17 @@ add_comment_response(
     "(e) Surrogate significance test: The circular-shift surrogate method "
     "(Shorten et al. 2021) is described in full, including the number of "
     "surrogates (100), minimum shift (10 steps), and the empirical "
-    "p-value formula with significance threshold p < 0.01."
+    "p-value formula with significance threshold p &lt; 0.01."
 )
 
 # ── Major 3 ──────────────────────────────────────────────────────────────────
 
-add_heading("Major Comment 3: Disentangle top-down causation from "
-            "common-driver forcing", level=2)
+story.append(Paragraph(
+    "Major Comment 3: Disentangle top-down causation from common-driver forcing",
+    heading2_style
+))
 
-add_comment_response(
+add_comment_response(story,
     "From a methodological standpoint, I am not convinced that the Author "
     "demonstrates convincingly that the alignment of individual units with "
     "the mean field is due to top-down causation rather than to forcing caused "
@@ -256,7 +235,7 @@ add_comment_response(
     "it is the shared driver), but a residual CTE(M\u2192x|K\u2099) persists across "
     "modulation amplitudes. At A = 60, conditioning reduces the TE by "
     "approximately 91%, yet the residual conditioned signal still shows "
-    "CTE(M\u2192x|K\u2099) > CTE(x\u2192M|K\u2099). A directional difference "
+    "CTE(M\u2192x|K\u2099) &gt; CTE(x\u2192M|K\u2099). A directional difference "
     "\u0394_CTE = CTE(M\u2192x|K\u2099) \u2212 CTE(x\u2192M|K\u2099) changes sign at intermediate "
     "amplitudes (A~15) and becomes positive at moderate to high modulation "
     "strengths. The two components \u2014 environmental scaffolding and emergent "
@@ -289,9 +268,9 @@ add_comment_response(
 
 # ── Minor 3 ──────────────────────────────────────────────────────────────────
 
-add_heading("Minor Comment 3: Unify terminology", level=2)
+story.append(Paragraph("Minor Comment 3: Unify terminology", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     'Please unify the terminology: "ensemble mean" (p. 4) vs. "mean field" '
     '(p. 5), "population mean" (p. 6), and so on.',
 
@@ -303,9 +282,9 @@ add_comment_response(
 
 # ── Minor 4 ──────────────────────────────────────────────────────────────────
 
-add_heading("Minor Comment 4: Show how TE varies with \u03c9", level=2)
+story.append(Paragraph("Minor Comment 4: Show how TE varies with \u03c9", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     "In Figure 1B, I suggest adding an inset illustrating how TE varies "
     "as a function of \u03c9.",
 
@@ -321,10 +300,12 @@ add_comment_response(
 
 # ── Minor 5 ──────────────────────────────────────────────────────────────────
 
-add_heading("Minor Comment 5: Clarify the saturation / soft-bound statement",
-            level=2)
+story.append(Paragraph(
+    "Minor Comment 5: Clarify the saturation / soft-bound statement",
+    heading2_style
+))
 
-add_comment_response(
+add_comment_response(story,
     'The Author writes that "The saturation was not due to numerical clipping; '
     'although a soft bound..." Please explain.',
 
@@ -343,9 +324,9 @@ add_comment_response(
 
 # ── Minor 6 ──────────────────────────────────────────────────────────────────
 
-add_heading("Minor Comment 6: Write out SNR and R\u00b2 formulas", level=2)
+story.append(Paragraph("Minor Comment 6: Write out SNR and R\u00b2 formulas", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     "Please explicitly write out the SNR and R\u00b2 formulas actually computed.",
 
     "We have added explicit formulas for both metrics in the new Methods "
@@ -358,9 +339,9 @@ add_comment_response(
 
 # ── Minor 7 ──────────────────────────────────────────────────────────────────
 
-add_heading("Minor Comment 7: Fix the GitHub repo URL", level=2)
+story.append(Paragraph("Minor Comment 7: Fix the GitHub repo URL", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     "The address of the GitHub repo is incorrect.",
 
     "The GitHub repository URL has been corrected to "
@@ -370,9 +351,9 @@ add_comment_response(
 
 # ── Minor 8 ──────────────────────────────────────────────────────────────────
 
-add_heading("Minor Comment 8: Fix Supplementary Figure S5 caption", level=2)
+story.append(Paragraph("Minor Comment 8: Fix Supplementary Figure S5 caption", heading2_style))
 
-add_comment_response(
+add_comment_response(story,
     'Supplementary Information, p. 4: The caption should indicate '
     '"Return maps of [...] A = {0, 20, 40, 60}".',
 
@@ -384,16 +365,16 @@ add_comment_response(
 # REVIEWER 2
 # ═════════════════════════════════════════════════════════════════════════════
 
-add_heading("Reviewer 2", level=1)
+story.append(Paragraph("Reviewer 2", heading1_style))
 
-add_comment_response(
+add_comment_response(story,
     "The starting point of this work is the fact that a set of chaotic systems "
     "can synchronize even in the absence of mutual coupling when driven by a "
     "common external signal, for example, through the modulation of one of their "
     "control parameters. This is a well-known phenomenon, characterized in the "
     "classical literature on chaotic systems. [...] I think this work should be "
     "mentioned, in particular for its section 5: Boccaletti, S., Kurths, J., "
-    "Osipov, G., Valladares, D. L., & Zhou, C. S. (2002). The synchronization "
+    "Osipov, G., Valladares, D. L., &amp; Zhou, C. S. (2002). The synchronization "
     "of chaotic systems. Physics Reports, 366(1\u20132), 1\u2013101. It goes without "
     "saying that it would be appreciated, at least in the continuation of this "
     "research line, to show the implications of the concept of synchronization "
@@ -420,9 +401,9 @@ add_comment_response(
 # REVIEWER 3
 # ═════════════════════════════════════════════════════════════════════════════
 
-add_heading("Reviewer 3", level=1)
+story.append(Paragraph("Reviewer 3", heading1_style))
 
-add_comment_response(
+add_comment_response(story,
     "One minor suggestion would be to sharpen, perhaps in the Discussion, the "
     "distinction between externally imposed boundary conditions and internally "
     'generated coordination, to further preempt potential misunderstandings '
@@ -450,5 +431,5 @@ add_comment_response(
 
 # ═════════════════════════════════════════════════════════════════════════════
 
-doc.save(OUTPATH)
-print(f"Response letter saved to: {OUTPATH}")
+doc.build(story)
+print(f"Response letter PDF saved to: {OUTPATH}")
